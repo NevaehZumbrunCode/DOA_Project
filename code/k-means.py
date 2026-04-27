@@ -9,27 +9,14 @@ import os
 import time
 import tracemalloc
 import pandas as pd
-from sklearn.datasets import make_blobs, load_iris
+from sklearn.datasets import make_blobs
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 
-# -----------------------------------
-# STEP 1: folders
-# -----------------------------------
+os.makedirs("../results", exist_ok=True)
 
-os.makedirs("results", exist_ok=True)
-
-# -----------------------------------
-# STEP 2: dataset sizes
-# -----------------------------------
-
-sizes = [200, 500, 1000, 2000]
-
+sizes = [1000, 5000, 10000, 20000]
 results = []
-
-# -----------------------------------
-# STEP 3: synthetic dataset experiments
-# -----------------------------------
 
 for n in sizes:
     X, _ = make_blobs(
@@ -39,23 +26,33 @@ for n in sizes:
         random_state=42
     )
 
-    tracemalloc.start()
-    start_time = time.time()
+    # warm-up run: do NOT record this
+    warmup_model = KMeans(n_clusters=3, random_state=42, n_init=10)
+    warmup_model.fit_predict(X)
 
-    model = KMeans(
-        n_clusters=3,
-        random_state=42
-    )
+    runtimes = []
+    memories = []
+    final_labels = None
 
-    labels = model.fit_predict(X)
+    # repeat and average
+    for trial in range(10):
+        tracemalloc.start()
+        start_time = time.perf_counter()
 
-    end_time = time.time()
-    current, peak = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
+        model = KMeans(n_clusters=3, random_state=42, n_init=10)
+        labels = model.fit_predict(X)
 
-    runtime = end_time - start_time
-    memory_mb = peak / (1024 * 1024)
-    sil = silhouette_score(X, labels)
+        end_time = time.perf_counter()
+        current, peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+
+        runtimes.append(end_time - start_time)
+        memories.append(peak / (1024 * 1024))
+        final_labels = labels
+
+    runtime = sum(runtimes) / len(runtimes)
+    memory_mb = sum(memories) / len(memories)
+    sil = silhouette_score(X, final_labels)
 
     results.append({
         "algorithm": "KMeans",
@@ -66,10 +63,6 @@ for n in sizes:
         "memory_mb": memory_mb,
         "silhouette_score": sil
     })
-
-# -----------------------------------
-# STEP 4: save CSV
-# -----------------------------------
 
 df = pd.DataFrame(results)
 df.to_csv("../results/kmeans_synthetic_results.csv", index=False)
