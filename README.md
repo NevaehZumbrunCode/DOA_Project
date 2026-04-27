@@ -93,6 +93,11 @@ python code/dbscan_scaling.py
 python code/firefly_scaling.py
 python code/hierarchical_scaling.py
 
+python code/dbscan_scaling_graphs.py
+python code/kmeans_scaling_graphs.py
+python code/firefly_scaling_graphs.py
+python code/hierarchical_scaling_graphs.py
+
 
 ---
 
