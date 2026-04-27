@@ -1,92 +1,78 @@
 # -------------------------
 # How to Run: 
-# 1) Install matplotpib scikit-learn (pip install matplotlib scikit-learn)
+# 1) Install pandas matplotpib scikit-learn (pip install matplotlib scikit-learn)
 # 2) python k-means.py
+# 3) python k-meansgraphs.py
 # -------------------------
 
-import matplotlib.pyplot as plt
+import os
 import time
 import tracemalloc
-from sklearn.datasets import load_iris
+import pandas as pd
+from sklearn.datasets import make_blobs, load_iris
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 
-# load dataset
-iris = load_iris()
-X = iris.data
+# -----------------------------------
+# STEP 1: folders
+# -----------------------------------
 
-k_values = range(2, 11)  # silhouette requires k >= 2
+os.makedirs("results", exist_ok=True)
 
-runtimes = []
-sil_scores = []
-memories = []
+# -----------------------------------
+# STEP 2: dataset sizes
+# -----------------------------------
 
-# start memory tracking
-tracemalloc.start()
+sizes = [200, 500, 1000, 2000]
 
-for k in k_values:
-    start = time.time()
+results = []
 
-    kmeans = KMeans(n_clusters=k, random_state=42)
-    labels = kmeans.fit_predict(X)
+# -----------------------------------
+# STEP 3: synthetic dataset experiments
+# -----------------------------------
 
-    end = time.time()
+for n in sizes:
+    X, _ = make_blobs(
+        n_samples=n,
+        centers=3,
+        cluster_std=1.0,
+        random_state=42
+    )
 
-    # runtime
-    runtimes.append(end - start)
+    tracemalloc.start()
+    start_time = time.time()
 
-    # silhouette score
-    score = silhouette_score(X, labels)
-    sil_scores.append(score)
+    model = KMeans(
+        n_clusters=3,
+        random_state=42
+    )
 
-    # memory usage (in MB)
+    labels = model.fit_predict(X)
+
+    end_time = time.time()
     current, peak = tracemalloc.get_traced_memory()
-    memories.append(peak / (1024 * 1024))
+    tracemalloc.stop()
 
-# stop memory tracking
-tracemalloc.stop()
+    runtime = end_time - start_time
+    memory_mb = peak / (1024 * 1024)
+    sil = silhouette_score(X, labels)
 
-# -------------------------
-# 1. Clustering Graph (k=3)
-# -------------------------
-kmeans = KMeans(n_clusters=3, random_state=42)
-labels = kmeans.fit_predict(X)
+    results.append({
+        "algorithm": "KMeans",
+        "dataset": "Synthetic",
+        "n": n,
+        "k": 3,
+        "runtime_seconds": runtime,
+        "memory_mb": memory_mb,
+        "silhouette_score": sil
+    })
 
-plt.figure()
-plt.scatter(X[:, 0], X[:, 1], c=labels)
-plt.xlabel("Sepal Length")
-plt.ylabel("Sepal Width")
-plt.title("K-means Clustering (k=3)")
-plt.savefig("../graphs/kmeans_iris_graphs/kmeansclustering.png")
+# -----------------------------------
+# STEP 4: save CSV
+# -----------------------------------
 
-# -------------------------
-# 2. Runtime Graph
-# -------------------------
-plt.figure()
-plt.plot(k_values, runtimes, marker='o')
-plt.xlabel("Number of Clusters (k)")
-plt.ylabel("Runtime (seconds)")
-plt.title("Runtime vs K")
-plt.savefig("../graphs/kmeans_iris_graphs/kmeansruntime.png")
+df = pd.DataFrame(results)
+df.to_csv("../results/kmeans_synthetic_results.csv", index=False)
 
-# -------------------------
-# 3. Silhouette Score Graph
-# -------------------------
-plt.figure()
-plt.plot(k_values, sil_scores, marker='o')
-plt.xlabel("Number of Clusters (k)")
-plt.ylabel("Silhouette Score")
-plt.title("Silhouette Score vs K")
-plt.savefig("../graphs/kmeans_iris_graphs/kmeanssilhouette.png")
-
-# -------------------------
-# 4. Memory Usage Graph
-# -------------------------
-plt.figure()
-plt.plot(k_values, memories, marker='o')
-plt.xlabel("Number of Clusters (k)")
-plt.ylabel("Memory Usage (MB)")
-plt.title("Memory Usage vs K")
-plt.savefig("../graphs/kmeans_iris_graphs/kmeansmemory.png")
-
-plt.show()
+print(df)
+print("Saved successfully.")
